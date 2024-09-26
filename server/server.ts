@@ -20,6 +20,10 @@ interface Group {
   members: Student[];
 }
 
+// Data stored here for persistance
+let totalStudents: number = 0;
+const groups: Group[] = [];
+
 const app = express();
 const port = 3902;
 
@@ -32,50 +36,78 @@ app.use(express.json());
  * @returns {Array} - Array of group objects
  */
 app.get('/api/groups', (req: Request, res: Response) => {
-  // TODO: (sample response below)
-  res.json([
-    {
-      id: 1,
-      groupName: 'Group 1',
-      members: [1, 2, 4],
-    },
-    {
-      id: 2,
-      groupName: 'Group 2',
-      members: [3, 5],
-    },
-  ]);
+  const allGroups: GroupSummary[] = [];
+  for (const group of groups) {
+
+    // Collect student ids of all students in a group
+    const studentNumber: number[] = [];
+    for (const student of group.members) {
+      studentNumber.push(student.id);
+    }
+
+    // Add group summary to list of groups
+    allGroups.push({
+      id: group.id,
+      groupName: group.groupName,
+      members: studentNumber
+    })
+  }
+  
+  res.json(allGroups);
 });
 
 /**
- * Route to get all students
+ * Route to get all students (ensuring no duplicates -> edge case)
  * @route GET /api/students
  * @returns {Array} - Array of student objects
  */
 app.get('/api/students', (req: Request, res: Response) => {
-  // TODO: (sample response below)
-  res.json([
-    { id: 1, name: 'Alice' },
-    { id: 2, name: 'Bob' },
-    { id: 3, name: 'Charlie' },
-    { id: 4, name: 'David' },
-    { id: 5, name: 'Eve' },
-  ]);
+  const allStudents: Student[] = [];
+
+  for (const group of groups) {
+    for (const student of group.members) {
+      allStudents.push(student);
+    }
+  }
+
+  res.json(allStudents);
 });
 
 /**
- * Route to add a new group
+ * Route to add a new group (assuming every student in the group is unique)
  * @route POST /api/groups
  * @param {string} req.body.groupName - The name of the group
  * @param {Array} req.body.members - Array of member names
  * @returns {Object} - The created group object
  */
 app.post('/api/groups', (req: Request, res: Response) => {
-  // TODO: implement storage of a new group and return their info (sample response below)
+  const groupName = req.body.groupName;
+  const studentNames = req.body.members;
+  const studentIds: number[] = [];
+  const groupMembers: Student[] = []
+
+  // Create every student in the group's list
+  for (const studentName of studentNames) {
+    studentIds.push(totalStudents);
+    groupMembers.push({
+      id: totalStudents,
+      name: studentName
+    })
+    totalStudents += 1;
+  }
+
+  // Create the actual group
+  const newGroup: Group = {
+    id: groups.length,
+    groupName: groupName,
+    members: groupMembers
+  }
+  groups.push(newGroup);
+
   res.json({
-    id: 3,
-    groupName: 'New Group',
-    members: [1, 2],
+    id: newGroup.id,
+    groupName: newGroup.groupName,
+    members: studentIds
   });
 });
 
@@ -86,7 +118,8 @@ app.post('/api/groups', (req: Request, res: Response) => {
  * @returns {void} - Empty response with status code 204
  */
 app.delete('/api/groups/:id', (req: Request, res: Response) => {
-  // TODO: (delete the group with the specified id)
+  const groupId = Number(req.body.id);
+  groups.splice(groupId, 1);
 
   res.sendStatus(204); // send back a 204 (do not modify this line)
 });
@@ -98,22 +131,14 @@ app.delete('/api/groups/:id', (req: Request, res: Response) => {
  * @returns {Object} - The group object with member details
  */
 app.get('/api/groups/:id', (req: Request, res: Response) => {
-  // TODO: (sample response below)
-  res.json({
-    id: 1,
-    groupName: 'Group 1',
-    members: [
-      { id: 1, name: 'Alice' },
-      { id: 2, name: 'Bob' },
-      { id: 3, name: 'Charlie' },
-    ],
-  });
+  const groupId = Number(req.params.id);
 
-  /* TODO:
-   * if (group id isn't valid) {
-   *   res.status(404).send("Group not found");
-   * }
-   */
+  // Checking and returning error for invalid groupIds
+  if (groupId < 0 || groupId >= groups.length) {
+    res.status(404).send("Group not found");
+  }
+
+  res.json(groups[groupId]);
 });
 
 app.listen(port, () => {
